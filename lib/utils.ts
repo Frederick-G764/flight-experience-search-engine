@@ -15,23 +15,23 @@ export function getIndicatorStyles(status: IndicatorStatus): {
   switch (status) {
     case 'excellent':
       return {
-        bg: 'bg-emerald-100',
-        border: 'border-emerald-500',
-        text: 'text-emerald-700',
+        bg: 'bg-emerald-500/10',
+        border: 'border-emerald-400/60',
+        text: 'text-emerald-200',
         symbol: '✓',
       };
     case 'fair':
       return {
-        bg: 'bg-amber-100',
-        border: 'border-amber-500',
-        text: 'text-amber-700',
+        bg: 'bg-amber-500/10',
+        border: 'border-amber-300/60',
+        text: 'text-amber-200',
         symbol: '⚠️',
       };
     case 'poor':
       return {
-        bg: 'bg-red-100',
-        border: 'border-red-500',
-        text: 'text-red-700',
+        bg: 'bg-rose-500/10',
+        border: 'border-rose-400/60',
+        text: 'text-rose-200',
         symbol: '✕',
       };
   }

@@ -137,19 +137,19 @@ export default function DetailTabs({ flight }: DetailTabsProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className="overflow-hidden rounded-3xl border border-white/15 bg-slate-950/70 shadow-xl shadow-slate-950/40 backdrop-blur">
       {/* Tab Headers */}
-      <div className="flex overflow-x-auto border-b border-gray-200">
+      <div className="flex overflow-x-auto border-b border-white/10">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'flex-1 min-w-[150px] px-6 py-4 text-sm font-semibold transition-colors duration-200 whitespace-nowrap',
+              'flex-1 min-w-[160px] px-6 py-4 text-sm font-semibold uppercase tracking-[0.2em] transition-all duration-200 whitespace-nowrap',
               activeTab === tab.key
-                ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:bg-gray-50'
-            )}
+                ? 'bg-slate-950/80 text-white shadow-inner shadow-slate-900/40'
+                : 'text-slate-200 hover:bg-slate-950/60'
+          )}
           >
             <span className="mr-2">{tab.icon}</span>
             {tab.label}
@@ -165,18 +165,18 @@ export default function DetailTabs({ flight }: DetailTabsProps) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between py-3 border-b border-gray-100 last:border-0">
-      <span className="text-gray-600 font-medium">{label}</span>
-      <span className="text-gray-900 font-semibold text-right max-w-md">{value}</span>
+    <div className="flex items-start justify-between gap-4 border-b border-white/15 py-4 last:border-0">
+      <span className="text-sm font-medium text-slate-200">{label}</span>
+      <span className="max-w-md text-right text-sm font-semibold text-slate-100">{value}</span>
     </div>
   );
 }
 
 function DetailList({ label, items }: { label: string; items: string[] }) {
   return (
-    <div className="py-3 border-b border-gray-100 last:border-0">
-      <div className="text-gray-600 font-medium mb-2">{label}</div>
-      <ul className="list-disc list-inside text-gray-900 space-y-1">
+    <div className="border-b border-white/15 py-4 last:border-0">
+      <div className="mb-2 text-sm font-medium text-slate-200">{label}</div>
+      <ul className="list-disc list-inside space-y-1 text-sm text-slate-100">
         {items.map((item, index) => (
           <li key={index}>{item}</li>
         ))}
