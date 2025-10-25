@@ -1,132 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { amadeusClient } from '@/lib/amadeus-client';
-import { mockFlights } from '@/lib/mockData';
 import { transformFlightOffers } from '@/lib/flight-transformer';
 
-/**
- * Flight Search API Route
- *
- * Searches for flights using the Amadeus API and transforms the data for our UI.
- * Falls back to mock data if Amadeus credentials are not configured.
- *
- * Usage:
- * GET /api/flights/search?origin=JFK&destination=LHR&date=2024-12-25&class=BUSINESS
- */
+function validateIata(value: string | null, label: string) {
+  if (!value) {
+    throw new Error(`Missing required parameter: ${label}`);
+  }
+  if (!/^[A-Z]{3}$/i.test(value)) {
+    throw new Error(`${label} must be a three-letter IATA code.`);
+  }
+}
+
+function validateDate(value: string | null, label: string) {
+  if (!value) {
+    throw new Error(`Missing required parameter: ${label}`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${label} must use YYYY-MM-DD format.`);
+  }
+}
 
 export async function GET(request: NextRequest) {
-  const startTime = Date.now();
+  const startedAt = Date.now();
 
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const origin = searchParams.get('origin');
-    const destination = searchParams.get('destination');
-    const date = searchParams.get('date');
-    const cabinClass = searchParams.get('class') || 'BUSINESS';
-    const nonStop = searchParams.get('nonStop') === 'true';
-    const maxResults = parseInt(searchParams.get('max') || '50');
+    const params = request.nextUrl.searchParams;
+    const origin = params.get('origin');
+    const destination = params.get('destination');
+    const date = params.get('date');
+    const returnDate = params.get('returnDate');
+    const travelClass = (params.get('travelClass') || 'ECONOMY').toUpperCase();
+    const nonStop = params.get('nonStop') === 'true';
+    const adults = Math.min(Math.max(parseInt(params.get('adults') || '1', 10), 1), 9);
+    const maxResults = Math.min(Math.max(parseInt(params.get('max') || '20', 10), 1), 250);
 
-    // Validate required parameters
-    if (!origin || !destination || !date) {
-      return NextResponse.json(
-        { error: 'Missing required parameters: origin, destination, date' },
-        { status: 400 }
-      );
+    validateIata(origin, 'origin');
+    validateIata(destination, 'destination');
+    validateDate(date, 'date');
+    if (returnDate) {
+      validateDate(returnDate, 'returnDate');
     }
 
-    // Validate date format
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
-      return NextResponse.json(
-        { error: 'Invalid date format. Use YYYY-MM-DD' },
-        { status: 400 }
-      );
-    }
-
-    // Check if API credentials are configured
     if (!process.env.AMADEUS_CLIENT_ID || !process.env.AMADEUS_CLIENT_SECRET) {
-      console.warn('Amadeus API credentials not configured, returning mock data');
-      return NextResponse.json({
-        data: mockFlights,
-        source: 'mock',
-        message: 'Using mock data. Set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET to use real data.',
-        meta: {
-          count: mockFlights.length,
-          searchTime: Date.now() - startTime,
+      return NextResponse.json(
+        {
+          error: 'Amadeus API credentials are missing.',
+          message: 'Configure AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET in your environment to enable live searches.',
         },
-      });
+        { status: 500 }
+      );
     }
-
-    // Search flights using Amadeus API
-    console.log(`Searching flights: ${origin} -> ${destination} on ${date} (${cabinClass})`);
 
     const amadeusResponse = await amadeusClient.searchFlights({
-      origin,
-      destination,
-      departureDate: date,
-      adults: 1,
-      travelClass: cabinClass as any,
+      origin: origin!.toUpperCase(),
+      destination: destination!.toUpperCase(),
+      departureDate: date!,
+      returnDate: returnDate || undefined,
+      travelClass: travelClass as any,
+      adults,
       nonStop,
       maxResults,
       currencyCode: 'USD',
     });
 
-    console.log(`Found ${amadeusResponse.data.length} flight offers from Amadeus`);
-
-    // Transform Amadeus data to our FlightData format
-    const transformedFlights = transformFlightOffers(
-      amadeusResponse.data,
-      amadeusResponse.dictionaries
-    );
+    const transformed = transformFlightOffers(amadeusResponse.data, amadeusResponse.dictionaries);
 
     return NextResponse.json({
-      data: transformedFlights,
-      source: 'amadeus',
+      data: transformed,
       meta: {
-        count: transformedFlights.length,
-        searchTime: Date.now() - startTime,
-        dictionaries: amadeusResponse.dictionaries,
+        count: transformed.length,
+        searchTime: Date.now() - startedAt,
       },
     });
-
   } catch (error) {
-    console.error('Flight search error:', error);
+    console.error('Amadeus flight search error', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
 
-    // Determine if this is an API error or a transformation error
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isApiError = errorMessage.includes('Amadeus') || errorMessage.includes('API');
-
-    // If it's an API error and we have mock data as fallback, return mock data
-    if (isApiError) {
-      console.warn('Amadeus API error, falling back to mock data:', errorMessage);
-      return NextResponse.json({
-        data: mockFlights,
-        source: 'mock_fallback',
-        message: 'Using mock data due to API error. Check logs for details.',
-        error: errorMessage,
-        meta: {
-          count: mockFlights.length,
-          searchTime: Date.now() - startTime,
-        },
-      });
-    }
-
-    // For other errors, return error response
     return NextResponse.json(
       {
-        error: 'Failed to search flights',
-        message: errorMessage,
-        details: error instanceof Error ? error.stack : undefined,
+        error: 'Unable to complete flight search.',
+        message,
       },
       { status: 500 }
     );
   }
 }
 
-/**
- * POST endpoint for more complex search requests
- */
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
+  const startedAt = Date.now();
 
   try {
     const body = await request.json();
@@ -135,99 +96,58 @@ export async function POST(request: NextRequest) {
       destination,
       departureDate,
       returnDate,
-      cabinClass = 'BUSINESS',
-      passengers = { adults: 1, children: 0, infants: 0 },
+      travelClass = 'ECONOMY',
+      adults = 1,
       nonStop = false,
-      maxResults = 50,
+      maxResults = 20,
     } = body;
 
-    // Validate required parameters
-    if (!origin || !destination || !departureDate) {
+    validateIata(origin, 'origin');
+    validateIata(destination, 'destination');
+    validateDate(departureDate, 'departureDate');
+    if (returnDate) {
+      validateDate(returnDate, 'returnDate');
+    }
+
+    if (!process.env.AMADEUS_CLIENT_ID || !process.env.AMADEUS_CLIENT_SECRET) {
       return NextResponse.json(
-        { error: 'Missing required parameters: origin, destination, departureDate' },
-        { status: 400 }
+        {
+          error: 'Amadeus API credentials are missing.',
+          message: 'Configure AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET in your environment to enable live searches.',
+        },
+        { status: 500 }
       );
     }
 
-    // Check if API credentials are configured
-    if (!process.env.AMADEUS_CLIENT_ID || !process.env.AMADEUS_CLIENT_SECRET) {
-      console.warn('Amadeus API credentials not configured, returning mock data');
-      return NextResponse.json({
-        data: mockFlights,
-        source: 'mock',
-        message: 'Using mock data. Set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET to use real data.',
-        meta: {
-          count: mockFlights.length,
-          searchTime: Date.now() - startTime,
-        },
-      });
-    }
-
-    // Search flights using Amadeus API
-    console.log(
-      `Searching flights (POST): ${origin} -> ${destination} on ${departureDate} (${cabinClass})`
-    );
-
     const amadeusResponse = await amadeusClient.searchFlights({
-      origin,
-      destination,
+      origin: origin.toUpperCase(),
+      destination: destination.toUpperCase(),
       departureDate,
       returnDate,
-      adults: passengers.adults || 1,
-      children: passengers.children || 0,
-      infants: passengers.infants || 0,
-      travelClass: cabinClass as any,
+      travelClass: travelClass.toUpperCase(),
+      adults: Math.min(Math.max(Number(adults) || 1, 1), 9),
       nonStop,
-      maxResults,
+      maxResults: Math.min(Math.max(Number(maxResults) || 20, 1), 250),
       currencyCode: 'USD',
     });
 
-    console.log(`Found ${amadeusResponse.data.length} flight offers from Amadeus`);
-
-    // Transform Amadeus data to our FlightData format
-    const transformedFlights = transformFlightOffers(
-      amadeusResponse.data,
-      amadeusResponse.dictionaries
-    );
+    const transformed = transformFlightOffers(amadeusResponse.data, amadeusResponse.dictionaries);
 
     return NextResponse.json({
-      data: transformedFlights,
-      source: 'amadeus',
+      data: transformed,
       meta: {
-        count: transformedFlights.length,
-        searchTime: Date.now() - startTime,
-        dictionaries: amadeusResponse.dictionaries,
+        count: transformed.length,
+        searchTime: Date.now() - startedAt,
       },
     });
-
   } catch (error) {
-    console.error('Flight search error (POST):', error);
+    console.error('Amadeus flight search error', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
 
-    // Determine if this is an API error
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isApiError = errorMessage.includes('Amadeus') || errorMessage.includes('API');
-
-    // If it's an API error, return mock data as fallback
-    if (isApiError) {
-      console.warn('Amadeus API error, falling back to mock data:', errorMessage);
-      return NextResponse.json({
-        data: mockFlights,
-        source: 'mock_fallback',
-        message: 'Using mock data due to API error. Check logs for details.',
-        error: errorMessage,
-        meta: {
-          count: mockFlights.length,
-          searchTime: Date.now() - startTime,
-        },
-      });
-    }
-
-    // For other errors, return error response
     return NextResponse.json(
       {
-        error: 'Failed to search flights',
-        message: errorMessage,
-        details: error instanceof Error ? error.stack : undefined,
+        error: 'Unable to complete flight search.',
+        message,
       },
       { status: 500 }
     );

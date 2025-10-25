@@ -52,9 +52,7 @@ export async function GET() {
         },
         nextSteps: [
           'Your Amadeus API connection is working!',
-          'You can now implement real flight search',
-          'Update /app/api/flights/search/route.ts to use Amadeus data',
-          'Combine Amadeus data with your cabin specifications database',
+          'Head to the homepage and run a search with your preferred IATA codes.',
         ],
       });
     } else {

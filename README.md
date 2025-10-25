@@ -1,228 +1,64 @@
-# Premium Flight Experience Search Prototype
+# Amadeus Flight Search Explorer
 
-A clickable prototype for a premium flight search platform that shows cabin experience features using visual indicators instead of subjective scores.
-
-## Overview
-
-This prototype demonstrates how travelers can search Business/First Class flights and see actual cabin features (seat dimensions, WiFi, privacy, entertainment) with objective data and visual indicators - NOT scores or ratings.
+A focused Next.js app that lets you query the **Amadeus Flight Offers Search API** and review real itineraries with carrier, aircraft, stop, and fare details.
 
 ## Features
 
-- **Search Form**: Simple search with 10 major airports, date picker, and cabin class selection
-- **Results Page**: Shows 6 mock flights in a card grid with key feature indicators
-- **Feature Indicators**: Visual system using ✓ (excellent) / ⚠️ (fair) / ✕ (poor)
-- **Hover Tooltips**: Compare features against other available flights
-- **Detail Pages**: Comprehensive specifications across 6 categories
-- **Responsive Design**: Works on mobile and desktop
-
-## Tech Stack
-
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- Amadeus Flight Offers Search API v2.9.1
-- Automatic fallback to mock data when API unavailable
+- **Live Amadeus integration** – query flight offers by origin, destination, and travel dates.
+- **Detailed itineraries** – see every segment with departure/arrival times, operating carrier, aircraft, and duration.
+- **Non-stop filter** – restrict results to direct flights with a single toggle.
+- **Responsive interface** – built with Tailwind CSS and the Next.js App Router.
 
 ## Getting Started
 
-### Installation
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### Development
+### 2. Configure Amadeus credentials
+
+Create `.env.local` and add the credentials from your Amadeus developer account:
+
+```bash
+AMADEUS_CLIENT_ID=your_client_id
+AMADEUS_CLIENT_SECRET=your_client_secret
+AMADEUS_API_ENDPOINT=https://test.api.amadeus.com
+```
+
+> The app does not include any mock flights. Without valid credentials every search request will return an authentication error message.
+
+### 3. Run the development server
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the prototype.
-
-### Build
-
-```bash
-npm run build
-```
-
-### Amadeus API Integration
-
-The application is fully integrated with the **Amadeus Flight Offers Search API** for real-time flight data. It automatically falls back to mock data if credentials are not configured.
-
-#### Setup (Optional - uses mock data by default)
-
-1. **Copy the example environment file:**
-   ```bash
-   cp .env.example .env.local
-   ```
-
-2. **Get Amadeus API credentials:**
-   - Visit https://developers.amadeus.com
-   - Create a free account and get your credentials
-
-3. **Add credentials to `.env.local`:**
-   ```bash
-   AMADEUS_CLIENT_ID=your_client_id_here
-   AMADEUS_CLIENT_SECRET=your_client_secret_here
-   AMADEUS_API_ENDPOINT=https://test.api.amadeus.com
-   ```
-
-4. **Restart the development server:**
-   ```bash
-   npm run dev
-   ```
-
-#### Documentation
-
-- [AMADEUS_INTEGRATION.md](./AMADEUS_INTEGRATION.md) - Complete API integration guide
-- [AMADEUS_SETUP.md](./AMADEUS_SETUP.md) - Detailed setup instructions
-
-**Note**: Without credentials, the app uses mock data automatically. `.env.local` is gitignored.
-
-## Key Principles
-
-1. **No Subjective Scores**: Never show ratings like "9.2/10" - only objective facts
-2. **Visual Indicators**: Use ✓/⚠️/✕ system consistently
-3. **Transparency**: Always show actual values (205cm, not just "excellent")
-4. **Context on Hover**: Tooltips show position vs competition
-5. **Factual Language**: "11 years old" not "aging product"
-6. **Clean & Scannable**: Easy to compare flights at a glance
+Open [http://localhost:3000](http://localhost:3000) in your browser and start searching.
 
 ## Project Structure
 
 ```
 /app
-  /page.tsx                 - Search form page
-  /results/page.tsx         - Results list
-  /flight/[id]/page.tsx     - Flight detail page
-  /layout.tsx               - Root layout
+  layout.tsx           # Root layout and metadata
+  page.tsx             # Landing page with the search experience
+  /api/flights/search  # API route that proxies Amadeus requests
 
 /components
-  /SearchForm.tsx           - Search form component
-  /FlightCard.tsx           - Flight card for results
-  /FeatureIndicator.tsx     - Indicator with tooltip
-  /DetailTabs.tsx           - Tabbed detail view
+  SearchFlights.tsx    # Client component with the form and results list
 
 /lib
-  /mockData.ts              - 6 flight configurations
-  /utils.ts                 - Utility functions
+  amadeus-client.ts    # Minimal client for authentication + flight search
+  flight-transformer.ts# Maps Amadeus responses to UI-friendly summaries
+  amadeus-types.ts     # TypeScript types for Amadeus responses
+  utils.ts             # UI helpers (formatting, class names)
 ```
 
-## Mock Data
+## Deployment
 
-The prototype includes 6 detailed flight configurations:
-
-1. **Lufthansa A350 Allegris** - Best overall (205cm bed, door suite, 50+ Mbps WiFi)
-2. **Qatar Airways A350 Qsuite** - Excellent (203cm bed, door suite)
-3. **Singapore Airlines A350** - Very good (198cm bed, enclosed suite)
-4. **Emirates 777** - Good (195cm bed, large screen)
-5. **American 787** - Acceptable (193cm bed, paid WiFi)
-6. **Lufthansa A340 Old** - Weakest (193cm bed, 2-2-2 layout, old cabin)
-
-## Indicator Logic
-
-### Bed Length
-- ✓ Excellent: ≥ 200cm
-- ⚠️ Fair: 190-199cm
-- ✕ Poor: < 190cm
-
-### Aisle Access
-- ✓ Excellent: All seats direct (1-2-1)
-- ⚠️ Fair: Some seats have access
-- ✕ Poor: Must climb over (2-2-2)
-
-### WiFi
-- ✓ Excellent: Free + fast (30+ Mbps)
-- ⚠️ Fair: Free but slow, or paid but fast
-- ✕ Poor: Paid and slow, or unavailable
-
-### Screen Size
-- ✓ Excellent: ≥ 21 inches
-- ⚠️ Fair: 15-20 inches
-- ✕ Poor: < 15 inches
-
-### Privacy
-- ✓ Excellent: Closing door
-- ⚠️ Fair: High dividers/enclosed suite
-- ✕ Poor: Open cabin
-
-### Cabin Age
-- ✓ Excellent: ≤ 3 years
-- ⚠️ Fair: 4-8 years
-- ✕ Poor: > 8 years
-
-## Deployment to Vercel
-
-### Option 1: Vercel Dashboard (Recommended)
-
-1. Push your code to GitHub
-2. Go to [vercel.com](https://vercel.com)
-3. Click "New Project"
-4. Import your GitHub repository
-5. Vercel will auto-detect Next.js and configure build settings
-6. Click "Deploy"
-
-### Option 2: Vercel CLI
-
-```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Login to Vercel
-vercel login
-
-# Deploy
-vercel
-
-# Deploy to production
-vercel --prod
-```
-
-### Environment Configuration
-
-No environment variables required for this prototype.
-
-### Build Configuration
-
-The project uses default Next.js build settings:
-- Build Command: `npm run build`
-- Output Directory: `.next`
-- Install Command: `npm install`
-
-## What's NOT Included
-
-This is a prototype demonstrating the UX concept. It does NOT include:
-
-- User accounts or authentication
-- Real API calls (Amadeus, etc.)
-- Database or backend
-- Filtering system
-- Actual booking functionality
-- Real airline data
-- Payment processing
-
-## Development Notes
-
-- All flight data is hardcoded in `/lib/mockData.ts`
-- Images are placeholders (actual cabin photos would be needed for production)
-- The prototype shows all 6 flights regardless of search parameters
-- "Book Now" buttons don't connect to any booking system
-
-## Success Criteria
-
-✅ User can search and see 6 flights
-✅ Each flight shows 6 features with indicators (✓/⚠️/✕)
-✅ Hover shows tooltip with position vs other flights
-✅ Detail page shows comprehensive specs
-✅ Everything is factual and objective (no scores)
-✅ Clean, professional design
-✅ Mobile responsive
-✅ Ready to deploy to Vercel
+The app is ready to deploy on platforms that support Next.js 14 (App Router). Set the same `AMADEUS_*` environment variables in your hosting provider before going live.
 
 ## License
 
 MIT
-
-## Support
-
-For issues or questions, please contact the project maintainer.
