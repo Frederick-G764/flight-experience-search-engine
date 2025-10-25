@@ -1,71 +1,41 @@
 /**
  * Amadeus API Client
  *
- * This is a basic structure for future Amadeus API integration.
- * Currently not used - the prototype uses mock data from mockData.ts
+ * Comprehensive implementation of the Amadeus Flight Offers Search API v2.9.1
+ * Provides methods to search for flights, get aircraft info, and manage authentication
  *
- * To use this:
- * 1. Set up environment variables (see .env.example)
- * 2. Get Amadeus API credentials (see AMADEUS_SETUP.md)
- * 3. Implement the methods below
- * 4. Replace mock data with real API calls
+ * Reference: https://developers.amadeus.com/self-service/category/flights/api-doc/flight-offers-search
  */
 
-interface AmadeusConfig {
-  clientId: string;
-  clientSecret: string;
-  endpoint: string;
-}
+import {
+  AmadeusConfig,
+  AmadeusFlightOffersResponse,
+  FlightOffersSearchParams,
+  FlightOffersPostRequest,
+  AmadeusAuthResponse,
+  AmadeusError,
+  Dictionaries,
+} from './amadeus-types';
 
 interface AccessToken {
   token: string;
   expiresAt: number;
 }
 
+// Legacy interface for backward compatibility
 interface FlightSearchParams {
   origin: string;
   destination: string;
   departureDate: string;
+  returnDate?: string;
   adults?: number;
+  children?: number;
+  infants?: number;
   travelClass?: 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST';
   nonStop?: boolean;
   maxResults?: number;
-}
-
-interface FlightOffer {
-  id: string;
-  price: {
-    total: string;
-    currency: string;
-  };
-  itineraries: Array<{
-    segments: Array<{
-      departure: {
-        iataCode: string;
-        at: string;
-      };
-      arrival: {
-        iataCode: string;
-        at: string;
-      };
-      carrierCode: string;
-      number: string;
-      aircraft: {
-        code: string;
-      };
-      duration: string;
-    }>;
-  }>;
-  travelerPricings: Array<{
-    fareDetailsBySegment: Array<{
-      cabin: string;
-      class: string;
-      amenities?: Array<{
-        description: string;
-        isChargeable: boolean;
-      }>;
-    }>;
-  }>;
+  currencyCode?: string;
+  maxPrice?: number;
 }
 
 class AmadeusClient {
@@ -81,12 +51,19 @@ class AmadeusClient {
   }
 
   /**
-   * Get or refresh access token
+   * Get or refresh access token using OAuth2 Client Credentials flow
    */
   private async getAccessToken(): Promise<string> {
     // Check if token exists and is still valid
     if (this.accessToken && this.accessToken.expiresAt > Date.now()) {
       return this.accessToken.token;
+    }
+
+    // Validate configuration
+    if (!this.config.clientId || !this.config.clientSecret) {
+      throw new Error(
+        'Amadeus API credentials not configured. Set AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables.'
+      );
     }
 
     // Request new token
@@ -103,10 +80,13 @@ class AmadeusClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get access token: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to get access token: ${response.status} ${response.statusText}. ${JSON.stringify(errorData)}`
+      );
     }
 
-    const data = await response.json();
+    const data: AmadeusAuthResponse = await response.json();
 
     this.accessToken = {
       token: data.access_token,
@@ -117,20 +97,44 @@ class AmadeusClient {
   }
 
   /**
-   * Search for flight offers
+   * Search for flight offers using GET method (simple search)
+   * @param params Flight search parameters
+   * @returns Amadeus flight offers response with full metadata
    */
-  async searchFlights(params: FlightSearchParams): Promise<FlightOffer[]> {
+  async searchFlights(params: FlightSearchParams): Promise<AmadeusFlightOffersResponse> {
     const token = await this.getAccessToken();
 
+    // Build search parameters
     const searchParams = new URLSearchParams({
       originLocationCode: params.origin,
       destinationLocationCode: params.destination,
       departureDate: params.departureDate,
       adults: String(params.adults || 1),
-      travelClass: params.travelClass || 'BUSINESS',
-      nonStop: String(params.nonStop || false),
-      max: String(params.maxResults || 50),
     });
+
+    // Add optional parameters
+    if (params.returnDate) {
+      searchParams.append('returnDate', params.returnDate);
+    }
+    if (params.children !== undefined) {
+      searchParams.append('children', String(params.children));
+    }
+    if (params.infants !== undefined) {
+      searchParams.append('infants', String(params.infants));
+    }
+    if (params.travelClass) {
+      searchParams.append('travelClass', params.travelClass);
+    }
+    if (params.nonStop !== undefined) {
+      searchParams.append('nonStop', String(params.nonStop));
+    }
+    if (params.currencyCode) {
+      searchParams.append('currencyCode', params.currencyCode);
+    }
+    if (params.maxPrice !== undefined) {
+      searchParams.append('maxPrice', String(params.maxPrice));
+    }
+    searchParams.append('max', String(params.maxResults || 50));
 
     const response = await fetch(
       `${this.config.endpoint}/v2/shopping/flight-offers?${searchParams}`,
@@ -143,15 +147,57 @@ class AmadeusClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Flight search failed: ${response.statusText}`);
+      const errorData: AmadeusError = await response.json().catch(() => ({
+        errors: [{ status: response.status, code: 0, title: response.statusText }],
+      }));
+      throw new Error(
+        `Flight search failed: ${response.status} ${response.statusText}. ${JSON.stringify(errorData.errors)}`
+      );
     }
 
-    const data = await response.json();
-    return data.data || [];
+    const data: AmadeusFlightOffersResponse = await response.json();
+    return data;
   }
 
   /**
-   * Get aircraft information
+   * Search for flight offers using POST method (advanced search)
+   * @param request Complex flight search request with multiple origin/destinations
+   * @returns Amadeus flight offers response with full metadata
+   */
+  async searchFlightsPost(request: FlightOffersPostRequest): Promise<AmadeusFlightOffersResponse> {
+    const token = await this.getAccessToken();
+
+    const response = await fetch(
+      `${this.config.endpoint}/v2/shopping/flight-offers`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-HTTP-Method-Override': 'GET',
+        },
+        body: JSON.stringify(request),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData: AmadeusError = await response.json().catch(() => ({
+        errors: [{ status: response.status, code: 0, title: response.statusText }],
+      }));
+      throw new Error(
+        `Flight search (POST) failed: ${response.status} ${response.statusText}. ${JSON.stringify(errorData.errors)}`
+      );
+    }
+
+    const data: AmadeusFlightOffersResponse = await response.json();
+    return data;
+  }
+
+  /**
+   * Get aircraft information from Amadeus reference data
+   * @param aircraftCode IATA aircraft code (e.g., "320" for A320)
+   * @returns Aircraft details including name
    */
   async getAircraftInfo(aircraftCode: string): Promise<any> {
     const token = await this.getAccessToken();
@@ -167,14 +213,16 @@ class AmadeusClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to get aircraft info: ${response.statusText}`);
+      throw new Error(`Failed to get aircraft info: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();
   }
 
   /**
-   * Get airline information
+   * Get airline information from Amadeus reference data
+   * @param airlineCode IATA airline code (e.g., "LH" for Lufthansa)
+   * @returns Airline details including name
    */
   async getAirlineInfo(airlineCode: string): Promise<any> {
     const token = await this.getAccessToken();
@@ -190,14 +238,16 @@ class AmadeusClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to get airline info: ${response.statusText}`);
+      throw new Error(`Failed to get airline info: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();
   }
 
   /**
-   * Get flight offer pricing details
+   * Get accurate flight offer pricing (confirms price before booking)
+   * @param flightOffer The flight offer to price
+   * @returns Updated pricing information
    */
   async getFlightPricing(flightOffer: any): Promise<any> {
     const token = await this.getAccessToken();
@@ -221,14 +271,15 @@ class AmadeusClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to get pricing: ${response.statusText}`);
+      throw new Error(`Failed to get pricing: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();
   }
 
   /**
-   * Test API connection
+   * Test API connection and credentials
+   * @returns true if connection successful, false otherwise
    */
   async testConnection(): Promise<boolean> {
     try {
@@ -239,10 +290,27 @@ class AmadeusClient {
       return false;
     }
   }
+
+  /**
+   * Get API configuration status
+   * @returns Object with configuration details (credentials masked)
+   */
+  getConfigStatus() {
+    return {
+      hasClientId: !!this.config.clientId,
+      hasClientSecret: !!this.config.clientSecret,
+      endpoint: this.config.endpoint,
+      hasActiveToken: !!(this.accessToken && this.accessToken.expiresAt > Date.now()),
+      tokenExpiresAt: this.accessToken?.expiresAt
+        ? new Date(this.accessToken.expiresAt).toISOString()
+        : null,
+    };
+  }
 }
 
 // Export singleton instance
 export const amadeusClient = new AmadeusClient();
 
 // Export types
-export type { FlightSearchParams, FlightOffer, AmadeusConfig };
+export type { FlightSearchParams, AmadeusConfig };
+export * from './amadeus-types';

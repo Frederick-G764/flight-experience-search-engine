@@ -20,7 +20,8 @@ This prototype demonstrates how travelers can search Business/First Class flight
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
-- No database (uses hardcoded mock data)
+- Amadeus Flight Offers Search API v2.9.1
+- Automatic fallback to mock data when API unavailable
 
 ## Getting Started
 
@@ -44,27 +45,39 @@ Open [http://localhost:3000](http://localhost:3000) to view the prototype.
 npm run build
 ```
 
-### Environment Variables (For Future API Integration)
+### Amadeus API Integration
 
-This prototype currently uses mock data and doesn't require any environment variables. However, when you're ready to integrate real flight data:
+The application is fully integrated with the **Amadeus Flight Offers Search API** for real-time flight data. It automatically falls back to mock data if credentials are not configured.
+
+#### Setup (Optional - uses mock data by default)
 
 1. **Copy the example environment file:**
    ```bash
    cp .env.example .env.local
    ```
 
-2. **Add your API credentials** (see `.env.example` for all options)
+2. **Get Amadeus API credentials:**
+   - Visit https://developers.amadeus.com
+   - Create a free account and get your credentials
 
-3. **For Amadeus API integration**, see the detailed guide:
-   - [AMADEUS_SETUP.md](./AMADEUS_SETUP.md) - Complete Amadeus API setup guide
-   - Get credentials at https://developers.amadeus.com
+3. **Add credentials to `.env.local`:**
+   ```bash
+   AMADEUS_CLIENT_ID=your_client_id_here
+   AMADEUS_CLIENT_SECRET=your_client_secret_here
+   AMADEUS_API_ENDPOINT=https://test.api.amadeus.com
+   ```
 
-4. **Key environment variables needed:**
-   - `AMADEUS_CLIENT_ID` - Your Amadeus API client ID
-   - `AMADEUS_CLIENT_SECRET` - Your Amadeus API secret key
-   - `AMADEUS_API_ENDPOINT` - API endpoint (test or production)
+4. **Restart the development server:**
+   ```bash
+   npm run dev
+   ```
 
-**Note**: `.env.local` is gitignored and will not be committed to version control.
+#### Documentation
+
+- [AMADEUS_INTEGRATION.md](./AMADEUS_INTEGRATION.md) - Complete API integration guide
+- [AMADEUS_SETUP.md](./AMADEUS_SETUP.md) - Detailed setup instructions
+
+**Note**: Without credentials, the app uses mock data automatically. `.env.local` is gitignored.
 
 ## Key Principles
 
