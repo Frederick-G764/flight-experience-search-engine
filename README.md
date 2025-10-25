@@ -44,6 +44,28 @@ Open [http://localhost:3000](http://localhost:3000) to view the prototype.
 npm run build
 ```
 
+### Environment Variables (For Future API Integration)
+
+This prototype currently uses mock data and doesn't require any environment variables. However, when you're ready to integrate real flight data:
+
+1. **Copy the example environment file:**
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. **Add your API credentials** (see `.env.example` for all options)
+
+3. **For Amadeus API integration**, see the detailed guide:
+   - [AMADEUS_SETUP.md](./AMADEUS_SETUP.md) - Complete Amadeus API setup guide
+   - Get credentials at https://developers.amadeus.com
+
+4. **Key environment variables needed:**
+   - `AMADEUS_CLIENT_ID` - Your Amadeus API client ID
+   - `AMADEUS_CLIENT_SECRET` - Your Amadeus API secret key
+   - `AMADEUS_API_ENDPOINT` - API endpoint (test or production)
+
+**Note**: `.env.local` is gitignored and will not be committed to version control.
+
 ## Key Principles
 
 1. **No Subjective Scores**: Never show ratings like "9.2/10" - only objective facts
